@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os.path
+import datetime as dt
 
 
 if not (os.path.exists('../dallas_weather.pkl')):
@@ -21,9 +22,9 @@ if not (os.path.exists('../dallas_weather.pkl')):
 
     # one hot encoding for sky conditions
     overcast = dallas_data.loc[:,'SKC']=='OVC'
-    clear = dallas_data.loc[:,'SKC']=='CLR'
-    broken = dallas_data.loc[:,'SKC']=='BKN'
-    scattered = dallas_data.loc[:,'SKC']=='SCT'
+    clear = dallas_data.loc[:,'CLR']=='CLR'
+    broken = dallas_data.loc[:,'BKN']=='BKN'
+    scattered = dallas_data.loc[:,'SCT']=='SCT'
 
 
     #dallas_data.loc[:,'YR--MODAHRMN']=str(hourly_data['YR--MODAHRMN'])
@@ -48,12 +49,12 @@ if not (os.path.exists('../dallas_weather.pkl')):
 
 else:
     dallas_data=pd.read_pickle('../dallas_weather.pkl')
-
+    dallas_data.to_csv('../dallas_weather.csv')
     
 ax=dallas_data.plot('YR--MODAHRMN','TEMP')
 ax=dallas_data.plot('YR--MODAHRMN','DEWP')
 ax=dallas_data.plot('YR--MODAHRMN','SPD')
-ax=dallas_data.plot('YR--MODAHRMN','DIR')
+
 ax=dallas_data.plot('YR--MODAHRMN','CLG')
 ax=dallas_data.plot('YR--MODAHRMN','VSB')
 #print (dallas_data['PCP01'])
@@ -64,7 +65,7 @@ dallas_data.loc[:,'PCP06']=pd.to_numeric(dallas_data['PCP06'],errors='coerce')
 dallas_data.loc[:,'PCP01']=pd.to_numeric(dallas_data['PCP01'],errors='coerce')
 ax=dallas_data.plot('YR--MODAHRMN','PCP06',kind='hist')
 ax=dallas_data.plot('YR--MODAHRMN','PCP01',kind='area')
-ax=dallas_data.plot('YR--MODAHRMN','PCP24',kind='hist')
+#ax=dallas_data.plot('YR--MODAHRMN','PCP24',kind='hist')
 ax=dallas_data.plot('YR--MODAHRMN','PCPXX',kind='hist')
 
 print(dallas_data.loc[:,'PCP01'].max())
@@ -72,4 +73,31 @@ print(dallas_data.loc[:,'PCP01'].sum())
 print(dallas_data.loc[:,'PCP06'].sum())
 print(dallas_data.loc[:,'PCP24'].sum())
 
+dallas_data=dallas_data.drop(['WBAN','L','M','H','MW','MW.1','MW.2','MW.3','AW','AW.1','AW.2','AW.3','W','MAX','MIN','SD','PCPXX'],1)
+dallas_data.loc[:,'PCP01']=dallas_data.loc[:,'PCP01'].fillna(value=0)   # change nans to 0 for precip
+dallas_data.loc[dallas_data.loc[:,'DIR']>360,'DIR']=0   # change windspeeds of over 360 to 0
+print(list(dallas_data))
+print(dallas_data)
+dallas_data.loc[:,'YR--MODAHRMN']=dallas_data.loc[:,'YR--MODAHRMN'].dt.round('1H')
+ax=dallas_data.plot('YR--MODAHRMN','DIR')
+ax=dallas_data.plot('YR--MODAHRMN','PCP01',kind='area')
+print(list(dallas_data))
+print(dallas_data)
+
+dallas_data=dallas_data.drop_duplicates(keep='first',subset='YR--MODAHRMN')
+
+
+mask=(dallas_data.loc[:,'YR--MODAHRMN']>=dt.datetime(2014,1,1, 1)) & (dallas_data.loc[:,'YR--MODAHRMN']<= dt.datetime(2017,5,31,23))
+
+dallas_data=dallas_data.loc[mask]
+dallas_data.rename(columns={'YR--MODAHRMN': 'DateTime'},inplace=True)
+print(dallas_data)
+
+grid_data=pd.read_csv('../real_time_grid_data.csv')
+dallas_data.to_csv('../weather_data.csv')
+print(grid_data)
+grid_data['DateTime']=pd.to_datetime(grid_data['DateTime'])
+merged_data=pd.merge(dallas_data,grid_data,on='DateTime',how='inner')
+ax=merged_data.plot('DateTime','WOODROW69W')
+print(merged_data)
 plt.show()
