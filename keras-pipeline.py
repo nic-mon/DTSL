@@ -121,9 +121,9 @@ print x_test.shape
 #val split
 # design network
 model = Sequential()
-model.add(LSTM(5,return_sequences=False,input_shape=(x_train.shape[1], x_train.shape[2])))
+model.add(LSTM(10,return_sequences=False,input_shape=(x_train.shape[1], x_train.shape[2])))
 #model.add(LSTM(25))
-model.add(Dense(15))
+#model.add(Dense(15))
 model.add(Dense(10))
 model.add(Dense(2))
 model.compile(loss='mse', optimizer='adam')
