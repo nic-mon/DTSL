@@ -5,6 +5,7 @@ import os.path
 import datetime as dt
 
 
+
 if not (os.path.exists('../dallas_weather.pkl')):
     hourly_data = pd.read_csv('../hourly_weather_2_dat.txt',delim_whitespace=True,na_values=['*','**','***','****','*****','******'])
     #print (hourly_data)
@@ -97,7 +98,15 @@ grid_data=pd.read_csv('../real_time_grid_data.csv')
 dallas_data.to_csv('../weather_data.csv')
 print(grid_data)
 grid_data['DateTime']=pd.to_datetime(grid_data['DateTime'])
+
 merged_data=pd.merge(dallas_data,grid_data,on='DateTime',how='inner')
 ax=merged_data.plot('DateTime','WOODROW69W')
 print(merged_data)
+
+
+U,s,V=np.linalg.svd(grid_data)
+
+print s
+
+
 plt.show()
