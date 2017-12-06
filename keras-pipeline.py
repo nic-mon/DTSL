@@ -56,7 +56,7 @@ def clean_data(data):
 
     #shifting data to create y labels 
 
-    shifted_realtime=data_resampled[['HB_NORTH','LZ_RAYBN']].shift(-1,freq='24H')   #shifts grid data forward 24 hours
+    shifted_realtime=data_resampled[['HB_NORTH_RealTime','LZ_RAYBN_RealTime']].shift(-1,freq='24H')   #shifts grid data forward 24 hours
     shifted_realtime.columns=['HB_NORTH_24H','LZ_RAYBN_24H']    # names columns
 
     #merge input data with y labels to create a full dataset
@@ -64,17 +64,25 @@ def clean_data(data):
 
     full_data=full_data.fillna(0) #fill nas with 0
     print(full_data.columns)
-    full_data=full_data.drop(['EB1_MNSES','Unnamed: 0','USAF'],axis=1) 
+    full_data=full_data.drop(['EB1_MNSES_RealTime','Unnamed: 0','USAF'],axis=1) 
 
     return full_data
 
-    
+#function that takes a cleaned dataframe that includes y labels and outputs scaled and normalized
+#data that is in the correct format for keras LSTM. Also splits test data
+
+def preprocess_data(data,lookback):
+
+    return (x_train,y_train,x_test,y_test)
+
+
 
 
 #####################Loading and Cleaning Data ###############################
 ##############################################################################
 
-data=pd.read_csv('../merged_grid_and_weather.csv')  # reads merged data
+#data=pd.read_csv('../merged_grid_and_weather.csv')  # reads merged data
+data=pd.read_csv('../all_the_data.csv')  # reads merged data
 
 full_data=clean_data(data)
 
@@ -83,11 +91,14 @@ full_data=clean_data(data)
 ##################################################################################################
 
 # reshape data
-timesteps=1;
+timesteps=1;    #leave this as 1 for now
+lookback=1  #the number of hours in the past that the lstm looks at
+
 
 time=full_data.index #create an index for time that we can use to plot things
 
 x_train=full_data.drop(['HB_NORTH_24H','LZ_RAYBN_24H'],axis=1) # create training data
+
 
 
 x_train=proc.scale(x_train,axis=0) #scale data so it is zero mean and unit variance
@@ -101,7 +112,6 @@ y_train=full_data[['HB_NORTH_24H','LZ_RAYBN_24H']]  # create y_train data
 
 
 
-lookback=100  #the number of hours in the past that the lstm looks at
 
 #expand data so its dimensions are nsamples X lookback X features 
 newData=expand_data(x_train,lookback) 
@@ -139,10 +149,10 @@ model = Sequential()
 
 #network layers###########################
 
-model.add(LSTM(50,return_sequences=False,input_shape=input_shape,activation='selu'))
-#model.add(LSTM(2))
+model.add(LSTM(3,return_sequences=True,input_shape=input_shape,activation='relu'))
+model.add(LSTM(2,activation='relu'))
 #model.add(Dense(15))
-#model.add(Dense(10))
+#model.add(Dense(2))
 model.add(Dense(2))
 
 #network compiling#########################
@@ -151,8 +161,7 @@ model.compile(loss='mae', optimizer='adam')
 
 #fit network
 
-history = model.fit(x_train, y_train[0::timesteps], epochs=20, batch_size=720, validation_split=0.0,verbose=2, shuffle=False)
-#history = model.fit(x_train, x_train[0::timesteps], epochs=5, batch_size=720, validation_split=0.10,verbose=2, shuffle=False)
+history = model.fit(x_train, y_train[0::timesteps], epochs=25, batch_size=1000, validation_split=0.1,verbose=2, shuffle=False)
 
 # plot history
 #plt.plot(history.history['loss'], label='train')
