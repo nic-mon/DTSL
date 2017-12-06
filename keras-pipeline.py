@@ -30,50 +30,57 @@ def expand_data(xdata,timesteps):
 
     return x_large
 
-        
-            
+#cleans data by dropping features and creating year, day, hour features and creating y-labels       
+def clean_data(data):
+
+    drop_features=['PCP06','PCP24','SKC','GUS']     # drop dirty or non-important data columns
+    data_pruned=data.drop(drop_features, axis=1) 
+
+    data_pruned['DateTime']=pd.to_datetime(data_pruned['DateTime']) # cast the date time column to datetime format
+
+    data_pruned=data_pruned.set_index('DateTime')   #sets index as a datetime index
+    data_pruned['DateTime']=data_pruned.index       # datetime column is also set to index, i had to do this because DateTime was removed by set_index 
+
+    data_resampled=data_pruned.resample('H').mean()     # resample data by the hour
+    data_resampled=data_resampled.fillna(method='pad')  # fills empty values by filling in with previous values. this needs to be improved
+
+    data_resampled['DateTime']=data_resampled.index     #creates a DateTime column from the datetime index
+
+    #add columns for year, year day, and hour
+    data_resampled['year'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_year-2014)
+    data_resampled['y_day'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_yday)
+    data_resampled['hour'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_hour)
+
+    data_resampled=data_resampled.drop('DateTime',axis=1)   #drop the datetime column
+
+
+    #shifting data to create y labels 
+
+    shifted_realtime=data_resampled[['HB_NORTH','LZ_RAYBN']].shift(-1,freq='24H')   #shifts grid data forward 24 hours
+    shifted_realtime.columns=['HB_NORTH_24H','LZ_RAYBN_24H']    # names columns
+
+    #merge input data with y labels to create a full dataset
+    full_data=pd.merge(data_resampled,shifted_realtime,how='inner',left_index=True,right_index=True) 
+
+    full_data=full_data.fillna(0) #fill nas with 0
+    print(full_data.columns)
+    full_data=full_data.drop(['EB1_MNSES','Unnamed: 0','USAF'],axis=1) 
+
+    return full_data
 
     
 
 
 #####################Loading and Cleaning Data ###############################
+##############################################################################
 
 data=pd.read_csv('../merged_grid_and_weather.csv')  # reads merged data
 
-drop_features=['PCP06','PCP24','SKC','GUS']     # drop dirty or non-important data columns
-data_pruned=data.drop(drop_features, axis=1) 
+full_data=clean_data(data)
 
-data_pruned['DateTime']=pd.to_datetime(data_pruned['DateTime']) # cast the date time column to datetime format
-
-data_pruned=data_pruned.set_index('DateTime')   #sets index as a datetime index
-data_pruned['DateTime']=data_pruned.index       # datetime column is also set to index, i had to do this because DateTime was removed by set_index 
-
-data_resampled=data_pruned.resample('H').mean()     # resample data by the hour
-data_resampled=data_resampled.fillna(method='pad')  # fills empty values by filling in with previous values. this needs to be improved
-
-data_resampled['DateTime']=data_resampled.index     #creates a DateTime column from the datetime index
-
-#add columns for year, year day, and hour
-data_resampled['year'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_year-2014)
-data_resampled['y_day'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_yday)
-data_resampled['hour'] = data_resampled['DateTime'].apply(lambda x: x.timetuple().tm_hour)
-
-data_resampled=data_resampled.drop('DateTime',axis=1)   #drop the datetime column
-
-
-#shifting data to create y labels 
-
-shifted_realtime=data_resampled[['HB_NORTH','LZ_RAYBN']].shift(-1,freq='24H')   #shifts grid data forward 24 hours
-shifted_realtime.columns=['HB_NORTH_24H','LZ_RAYBN_24H']    # names columns
-
-#merge input data with y labels to create a full dataset
-full_data=pd.merge(data_resampled,shifted_realtime,how='inner',left_index=True,right_index=True) 
-
-full_data=full_data.fillna(0) #fill nas with 0
-print(full_data.columns)
-full_data=full_data.drop(['EB1_MNSES','Unnamed: 0','USAF'],axis=1) 
 
 ################### Reshaping data so it is compatible with keras ################################
+##################################################################################################
 
 # reshape data
 timesteps=1;
@@ -123,6 +130,7 @@ x_test=newData[test_split:24000,:,:]
 
 
 ################## Keras Neural Network Design, Training, and Prediction ######################################################
+###############################################################################################################################
 
 # design network
 input_shape=(x_train.shape[1], x_train.shape[2])
@@ -143,7 +151,7 @@ model.compile(loss='mae', optimizer='adam')
 
 #fit network
 
-history = model.fit(x_train, y_train[0::timesteps], epochs=50, batch_size=720, validation_split=0.0,verbose=2, shuffle=False)
+history = model.fit(x_train, y_train[0::timesteps], epochs=20, batch_size=720, validation_split=0.0,verbose=2, shuffle=False)
 #history = model.fit(x_train, x_train[0::timesteps], epochs=5, batch_size=720, validation_split=0.10,verbose=2, shuffle=False)
 
 # plot history
