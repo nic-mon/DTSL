@@ -38,7 +38,15 @@ def clean_data(data):
 	shifted_realtime=data_resampled[['HB_NORTH_RealTime','LZ_RAYBN_RealTime']].shift(-1,freq='24H')
 	shifted_realtime.columns=['HB_NORTH_24H','LZ_RAYBN_24H']
 
+	shifted_dayahead = data_resampled[['HB_NORTH_DayAhead','LZ_RAYBN_DayAhead']].shift(-1,freq='24H')
+	shifted_dayahead.columns=['HB_NORTH_DA_24H','LZ_RAYBN_DA_24H']
+
 	full_data=pd.merge(data_resampled,shifted_realtime,how='inner',left_index=True,right_index=True)
+	full_data=pd.merge(full_data,shifted_dayahead,how='inner',left_index=True,right_index=True)
+
+	full_data['HB_NORTH_residuals'] = full_data['HB_NORTH_24H'] - full_data['HB_NORTH_DA_24H']
+	full_data['LZ_RAYBN_residuals'] = full_data['LZ_RAYBN_24H'] - full_data['LZ_RAYBN_DA_24H']
+
 	return full_data
 
 def expand_data(xdata,timesteps):
@@ -111,7 +119,7 @@ if __name__ == '__main__':
 	timesteps = args.t
 	loss = 'mae'
 	features = ['HB_NORTH_RealTime','OilBarrelPrice','year', 'y_day', 'w_day', 'hour', 'TEMP']
-	target = ['HB_NORTH_24H']
+	target = ['HB_NORTH_residuals']
 
 	X_train, X_test, y_train, y_test = create_splits(data, timesteps, features, target)
 
@@ -128,7 +136,7 @@ if __name__ == '__main__':
 	plt.plot(actual, 'red', np.squeeze(preds), 'blue')
 	plt.ylabel('price')
 	plt.show()
-
+	sys.exit()
 
 	with open("sweeps/n{}_s{}_t{}.txt".format(n_layers,size,timesteps), "wb") as fp:   #Pickling
 		pickle.dump(hist.history['val_loss'], fp)
