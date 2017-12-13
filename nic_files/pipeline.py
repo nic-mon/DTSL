@@ -108,7 +108,7 @@ def fit_model(X_train, X_test, y_train, y_test, n_layers, size, loss='mse'):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('--n', help='n_layers', type=int, default=3)
-	parser.add_argument('--s', help='size', type=int, default=50)
+	parser.add_argument('--s', help='size', type=int, default=64)
 	parser.add_argument('--t', type=int, default=6)
 	args = parser.parse_args()
 
