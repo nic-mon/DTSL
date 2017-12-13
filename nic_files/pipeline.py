@@ -38,7 +38,15 @@ def clean_data(data):
 	shifted_realtime=data_resampled[['HB_NORTH_RealTime','LZ_RAYBN_RealTime']].shift(-1,freq='24H')
 	shifted_realtime.columns=['HB_NORTH_24H','LZ_RAYBN_24H']
 
+	shifted_dayahead = data_resampled[['HB_NORTH_DayAhead','LZ_RAYBN_DayAhead']].shift(-1,freq='24H')
+	shifted_dayahead.columns=['HB_NORTH_DA_24H','LZ_RAYBN_DA_24H']
+
 	full_data=pd.merge(data_resampled,shifted_realtime,how='inner',left_index=True,right_index=True)
+	full_data=pd.merge(full_data,shifted_dayahead,how='inner',left_index=True,right_index=True)
+
+	full_data['HB_NORTH_residuals'] = full_data['HB_NORTH_24H'] - full_data['HB_NORTH_DA_24H']
+	full_data['LZ_RAYBN_residuals'] = full_data['LZ_RAYBN_24H'] - full_data['LZ_RAYBN_DA_24H']
+
 	return full_data
 
 def expand_data(xdata,timesteps):
@@ -63,7 +71,17 @@ def create_splits(data, timesteps, features, target):
 	X = np.array(newData[:,:,:-1])
 	Y = np.array(newData[:,:,-1:])
 
-	X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.3)
+	split = 2*len(X)//3
+
+	X_train = X[:split,:,:]
+	X_test = X[split:,:,:]
+	y_train = Y[:split,:,:]
+	y_test = Y[split:,:,:]
+	print(X_train.shape)
+	print(X_test.shape)
+	print(y_train.shape)
+	print(y_test.shape)
+	#X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.3)
 
 	return X_train, X_test, y_train, y_test
 
@@ -83,14 +101,14 @@ def fit_model(X_train, X_test, y_train, y_test, n_layers, size, loss='mse'):
 	y_train = np.squeeze(y_train[:,-1,:])
 	y_test = np.squeeze(y_test[:,-1,:])
 
-	history = model.fit(X_train, y_train, epochs=100, batch_size=720, validation_data=(X_test,y_test),verbose=2, shuffle=True)
-	return history
+	history = model.fit(X_train, y_train, epochs=50, batch_size=720, validation_data=(X_test,y_test),verbose=2, shuffle=True)
+	return history, model, y_train, y_test
 
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	parser.add_argument('--n', help='n_layers', type=int, default=3)
-	parser.add_argument('--s', help='size', type=int, default=50)
+	parser.add_argument('--s', help='size', type=int, default=64)
 	parser.add_argument('--t', type=int, default=6)
 	args = parser.parse_args()
 
@@ -100,12 +118,25 @@ if __name__ == '__main__':
 	size = args.s
 	timesteps = args.t
 	loss = 'mae'
-	features = ['HB_NORTH_RealTime','OilBarrelPrice','year', 'y_day', 'hour']
-	target = ['HB_NORTH_24H']
+	features = ['HB_NORTH_RealTime','OilBarrelPrice','year', 'y_day', 'w_day', 'hour', 'TEMP']
+	target = ['HB_NORTH_residuals']
 
 	X_train, X_test, y_train, y_test = create_splits(data, timesteps, features, target)
 
-	hist = fit_model(X_train, X_test, y_train, y_test, n_layers, size, loss=loss)
+	hist, model, y_train, y_test = fit_model(X_train, X_test, y_train, y_test, n_layers, size, loss=loss)
+
+	preds = []
+	actual = []
+
+	for i in range(len(y_test)):
+		preds.append(model.predict(np.expand_dims(X_test[i,:,:],axis=0)))
+		actual.append(y_test[i])
+
+	import matplotlib.pyplot as plt
+	plt.plot(actual, 'red', np.squeeze(preds), 'blue')
+	plt.ylabel('price')
+	plt.show()
+	sys.exit()
 
 	with open("sweeps/n{}_s{}_t{}.txt".format(n_layers,size,timesteps), "wb") as fp:   #Pickling
 		pickle.dump(hist.history['val_loss'], fp)
