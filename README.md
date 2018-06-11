@@ -1,6 +1,6 @@
 # DTSL
 
- Final Project CS 294
+ Final Project CS 294 : 
  Deep Time Series Learning
 ##
 In this project we explored a deep neural network based approach in order to forecast day ahead prices.
